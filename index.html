@@ -1,599 +1,85 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>がっぽり寿司極　期待値計算</title>
-<style>
-:root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#172033;background:#f4f6fb}
-*{box-sizing:border-box}body{max-width:1050px;margin:auto;padding:20px}
-h1{font-size:clamp(1.4rem,3vw,2rem);margin:0 0 8px}h2{font-size:1.12rem;margin:0 0 12px}
-p,li{line-height:1.65}.panel{background:white;border:1px solid #dce3ef;border-radius:15px;padding:17px;margin:14px 0}
-label{font-weight:700;display:block;margin-bottom:6px}.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
-input[type=text]{width:100%;font:inherit;font-size:1.25rem;padding:11px;border:1px solid #bcc8db;border-radius:9px}
-.small{font-size:.88rem;color:#5a667c}.hint{background:#eef5ff;padding:12px;border-radius:10px}
-button{border:0;border-radius:9px;padding:11px 15px;font:inherit;font-weight:700;background:#245bd6;color:#fff;cursor:pointer}
-button.secondary{background:#e8edf7;color:#172033}.controls{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-top:12px}
-.error{color:#b42318}.success{color:#147547}.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:9px}
-.metric{background:#f7f9fd;border:1px solid #e3e9f2;border-radius:10px;padding:13px}.metric span{font-size:.85rem;color:#59657a;display:block}.metric strong{display:block;font-size:1.35rem;margin-top:4px;overflow-wrap:anywhere}
-.layout{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
-.slot{background:#f6f8fc;border:1px solid #dce3ef;border-radius:8px;text-align:center;padding:7px 3px;min-width:0}
-.slot small{display:block;color:#64718a}.slot b{font-size:.94rem;overflow-wrap:anywhere}
-table{border-collapse:collapse;width:100%;min-width:460px}th,td{text-align:left;padding:9px;border-bottom:1px solid #e4e9f1}th{color:#5a667c;font-size:.85rem}.tablewrap{overflow:auto}
-@media(max-width:600px){body{padding:11px}.panel{padding:12px}.layout{grid-template-columns:repeat(3,minmax(0,1fr))}}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#123d40">
+  <title>がっぽり寿司極｜期待値計算機 1.1.0</title>
+  <link rel="stylesheet" href="styles.css?v=1.1.0">
+  <script src="layouts.js?v=1.1.0" defer></script>
+  <script src="app.js?v=1.1.0" defer></script>
 </head>
 <body>
-<h1>がっぽり寿司極｜期待値計算</h1>
+  <header class="hero">
+    <div class="eyebrow">GAPPORI SUSHI KIWAMI <span class="version">1.1.0</span></div>
+    <h1>がっぽり寿司極<br><span>期待値計算機</span></h1>
+    <p>台の配置を選んで、SPの位置と買い方を指定。</p>
+    <a class="old-version" href="https://github.com/tonnchiki/gappori-sushi-kiwami_mackey/releases/tag/1.0.0">旧版 1.0.0 の保存先 ↗</a>
+  </header>
+  <main>
+    <section class="panel" aria-labelledby="presetHeading">
+      <div class="section-heading"><span class="step">01</span><h2 id="presetHeading">今の配置を選ぶ</h2><span class="badge">全29配置</span></div>
+      <div class="preset-controls">
+        <div><label for="presetNumber">配置番号</label><input id="presetNumber" type="number" min="1" max="29" step="1" value="1" inputmode="numeric" aria-describedby="presetHelp"></div>
+        <button id="nextPreset" type="button">次の配置へ <span aria-hidden="true">→</span></button>
+      </div>
+      <p id="presetHelp" class="muted">29番の次は1番に戻ります。切り替えると購入数とSPの位置を初期化します。</p>
+      <div class="preset-summary"><strong id="presetLabel"></strong><span id="presetDigits"></span></div>
+      <div class="fields two-fields">
+        <div><label for="spType">SPの種類</label><select id="spType"><option value="oya">おやじSP</option><option value="okami">おかみSP</option><option value="either">どっちかSP（1：1）</option></select><p class="muted">配置表の指定を自動設定します。必要に応じて変更できます。</p></div>
+        <div><label for="spGap">☆ SPを置く境目</label><select id="spGap"></select><p class="muted">初期位置は最後のネタとAの間です。実機に合わせて変更してください。</p></div>
+      </div>
+      <p class="instruction"><span aria-hidden="true">☆</span> 下の境目をタップしても、SPを移動できます。</p>
+      <div id="blockBoard" class="block-board" aria-label="ネタのまとまりとSPの配置"></div>
+      <p class="direction">並び順 → 最後は先頭のAにつながります</p>
+      <details class="physical-layout"><summary>18穴の円形配置を確認</summary><div id="ring" class="ring"></div></details>
+    </section>
 
+    <section class="panel" aria-labelledby="buyHeading">
+      <div class="section-heading"><span class="step">02</span><h2 id="buyHeading">買い方を決める</h2><span id="buyTotal" class="badge" aria-live="polite">合計 0 / 5個</span></div>
+      <p class="muted">各ネタを何個買うか指定してください。同じ穴数でも、A・B・C…は別のネタです。買わないネタは0個にします。</p>
+      <div id="buyCards" class="buy-cards"></div>
+      <div class="fields two-fields settings-fields">
+        <div><label for="freeRate">フリー率（％）</label><input id="freeRate" type="number" min="0" max="100" step="any" value="80" inputmode="decimal"></div>
+        <div><label for="payout">当選1回の配当（チップ）</label><input id="payout" type="number" min="0" step="any" placeholder="例：100" inputmode="decimal"></div>
+      </div>
+      <button id="calculate" class="primary" type="button">期待値を計算する</button>
+      <p id="status" class="status" role="status" aria-live="polite">購入数を合計5個にし、配当を入力してください。</p>
+    </section>
 
-<div class="panel">
-<h2>1. 数字で入力</h2>
-<div class="fields">
- <div><label for="netaCount">ネタ数</label><input id="netaCount" type="text" value="" autocomplete="off" spellcheck="false"><p class="small">例：223 → Aが2ポケット、Bが2ポケット、Cが3ポケット。配置条件に応じて <code>?23</code>、<code>23?</code>、<code>23/?</code> などを指定します。</p></div>
- <div><label for="buyPattern">買い方</label><input id="buyPattern" type="text" value="" autocomplete="off" spellcheck="false"><p class="small">例：221 → Aを2個、Bを2個、Cを1個購入（合計5個）</p></div>
- <div><label for="freeRate">フリー率（％）</label><div style="display:flex;align-items:center;gap:8px"><input id="freeRate" type="number" min="0" max="100" step="1" value="80" style="width:100%;font:inherit;font-size:1.25rem;padding:11px;border:1px solid #bcc8db;border-radius:9px"><strong>%</strong></div></div>
- <div><label for="payout">配当</label><input id="payout" type="number" min="0" step="any" value="" style="width:100%;font:inherit;font-size:1.25rem;padding:11px;border:1px solid #bcc8db;border-radius:9px"><p class="small">当選1回あたりの配当額（チップ）</p></div>
- <div><label for="spType">SP</label><select id="spType" style="width:100%;font:inherit;font-size:1rem;padding:12px;border:1px solid #bcc8db;border-radius:9px;background:white"><option value="oya" selected>おやじスペシャル</option><option value="okami">おかみスペシャル</option><option value="either">どっちかスペシャル（おやじ：おかみ＝1：1）</option></select><p class="small">おやじSPでは <code>?</code> は不要。おかみSPとどっちかSPでは <code>?</code> が必須です。</p></div>
-</div>
-<p class="hint"><b>記号の意味</b><br><code>/</code>：ネタブロック間に「その他」をちょうど2個配置。<br><code>!</code>：ネタブロック間に「その他」をちょうど1個配置。<br><code>?</code>：SP位置。<code>?23</code> は先頭ネタの手前、<code>23?</code> は末尾ネタの奥、<code>23/?</code> は最後のネタと隣接しない位置、<code>2?3</code> はネタブロック間に隣接配置。<code>?23</code> と <code>23?</code> は円環上の位置関係が異なるため、別々に計算します。<br>おやじSPを選択した場合は <code>?</code> を入力しなくても計算できます。入力した場合、その枠は追加効果のない枠として扱います。</p>
-<div class="controls"><button id="calculate">配置を生成して計算</button></div><p id="status" aria-live="polite"></p>
-</div>
-<div class="panel">
-<h2>2. 期待値</h2>
-<div class="metrics">
- <div class="metric"><span>フリー率を考慮した当選率</span><strong id="winRate">—</strong></div>
- <div class="metric"><span>期待値（当選率 × 配当 ÷ 20）</span><strong id="expectedValue">—</strong></div>
-</div>
-<p class="small">フリーが使えない場合でも、フリーなしで5球の購入条件を満たせば当選として計算します。期待値は「当選率 × 配当 ÷ ベット数20」を％表示します。</p>
-</div>
+    <section class="panel results-panel" aria-labelledby="resultHeading">
+      <div class="section-heading"><span class="step">03</span><h2 id="resultHeading">計算結果</h2></div>
+      <div class="metrics">
+        <div class="metric"><span>フリー率を考慮した当選率</span><strong id="winRate">—</strong></div>
+        <div class="metric accent"><span>期待値・リターン率</span><strong id="expectedValue">—</strong></div>
+      </div>
+      <p class="muted">リターン率 ＝ 当選率 × 配当 ÷ 20 × 100。1ゲームのベット数は20です。</p>
+      <p id="resultSummary" class="result-summary"></p>
+      <details><summary>当選通り数とフリーミス</summary>
+        <dl class="ways"><div><dt>最適なフリーありで当選</dt><dd id="freeWinWays">—</dd></div><div><dt>フリーなしで当選</dt><dd id="noFreeWinWays">—</dd></div><div><dt>フリーミス</dt><dd id="freeMissWays">—</dd></div></dl>
+        <p class="muted">フリーミスは、3球後に選んだ最適なフリーでは外れるものの、別のネタを選んでいれば当選した結果です。どっちかSPは1：1の2分岐を含む共通の分母で表示します。</p>
+      </details>
+    </section>
 
-<div class="panel">
-<h2>3. 当選通り数</h2>
-<div class="metrics">
- <div class="metric"><span>フリーありで当選する通り数</span><strong id="freeWinWays">—</strong></div>
-  <div class="metric"><span>フリーなしで当選する通り数</span><strong id="noFreeWinWays">—</strong></div>
-  <div class="metric"><span>フリーミスが起こる通り数</span><strong id="freeMissWays">—</strong></div>
-</div>
+    <section class="panel" aria-labelledby="profitHeading">
+      <div class="section-heading"><span class="step">04</span><h2 id="profitHeading">累計黒字になる確率</h2></div>
+      <label for="targetWinProbability">目標勝率（％）</label>
+      <div class="profit-controls"><input id="targetWinProbability" type="number" min="0" max="100" step="any" value="90" inputmode="decimal"><button id="calculateProfitProbability" class="secondary" type="button">必要な回数を計算</button></div>
+      <div class="metrics compact"><div class="metric"><span>目標勝率を初めて上回る試行回数</span><strong id="requiredTrials">—</strong></div><div class="metric"><span>その試行回数で累計黒字になる確率</span><strong id="profitProbabilityResult">—</strong></div></div>
+      <p id="profitProbabilityStatus" class="muted" role="status">現在の配置・買い方・フリー率・配当で計算します。</p>
+      <p class="muted">毎回すべての穴が空いた状態から開始し、同じ条件で独立に試行する前提です。黒字は累計配当が累計ベットを上回ること。5,000回までは二項分布の厳密計算、それ以降100,000回までは正規近似です。</p>
+    </section>
 
-</div>
-
-<div class="panel">
-<h2>4. 自動生成された18ポケット配置</h2>
-<p class="small">同じネタは必ず連続したブロックとして配置します。SP選択と <code>?</code> の有無に応じて配置を生成します。おかみSPの追加球は18枠すべて均等（各1/18）に抽選し、最初の五球で入賞済みの枠は追加抽選ではずれ扱いです。</p>
-<div id="layout" class="layout"></div>
-<p id="summary" class="small"></p>
-</div>
-
-<div class="panel" id="profitProbabilityPanel">
-<h2>5. 勝率計算</h2>
-<div class="fields">
- <div>
-  <label for="targetWinProbability">目標勝率</label>
-  <div style="display:flex;align-items:center;gap:8px">
-   <input id="targetWinProbability" type="number" min="0" max="100" step="0.1" value="90" style="width:100%;font:inherit;font-size:1.25rem;padding:11px;border:1px solid #bcc8db;border-radius:9px">
-   <strong>%</strong>
-  </div>
-  <p class="small">入力した勝率を、累計収支が黒字になる確率が初めて上回る試行回数を計算します。</p>
- </div>
-</div>
-<div class="controls"><button id="calculateProfitProbability" type="button">勝率を計算</button></div>
-<div class="metrics" style="margin-top:12px">
- <div class="metric"><span>目標勝率を初めて上回る試行回数</span><strong id="requiredTrials">—</strong></div>
- <div class="metric"><span>その試行回数で累計黒字になる確率</span><strong id="profitProbabilityResult">—</strong></div>
-</div>
-<p id="profitProbabilityStatus" class="small" aria-live="polite">先に「配置を生成して計算」を押し、買い方・フリー率・配当から当選率を更新してください。</p>
-<p class="small">黒字の定義：累計配当額が累計ベット額（1回20チップ × 試行回数）を1チップ以上上回ること。各試行は毎回新しい独立した抽選とし、1回ごとの当選確率は上の当選率で一定と仮定します。計算は最大100,000回まで検索します。</p>
-</div>
-
-<div class="panel">
-<h2>計算上の前提</h2>
-<ul>
-<li>合計5球。最初の3球を見てからフリーを1個分選び、残り2球を抽選します。</li>
-<li>買い方の各数字は、そのネタを有効にするために必要な入賞回数です。購入数2なら、そのネタの別々の物理ポケットに合計2回入る必要があります。</li>
-<li>同じ物理ポケットには同じ抽選内で再入賞しませんが、同じネタの別ポケットには入賞できます。</li>
-<li>ネタ数の合計は18以下、買い方の合計は5である必要があります。</li>
-<li>最初の五球は従来の確率移動モデルを使用します。</li>
-<li>おやじSPは追加球なし。おかみSPは最初の五球でSP枠に入賞していた場合に追加球を1回発生させます。追加球は18枠均等で、最初の五球で入賞した枠ははずれ扱いです。</li>
-<li>どっちかSPは、おやじSPとおかみSPの計算結果をそれぞれ50％ずつ合算します。</li>
-</ul>
-<p class="hint"><b>注意：</b>最初の五球は従来の確率移動モデル、追加の一球は18枠均等モデルで計算します。おかみSP・どっちかSPではネタ数欄の <code>?</code> でSP位置を指定します。おやじSPでは <code>?</code> は不要です。</p>
-</div>
-<script>
-const N=18;
-const $=id=>document.getElementById(id);
-function parsePattern(s,spMode){
- const chars=[...s.trim()],groups=[],separators=[];
- let pending=null,seenDigit=false,questionCount=0,leadingOkami=false,trailingOkami=false,endGapSlash=false;
- for(let i=0;i<chars.length;i++){
-  const ch=chars[i];
-  if(/\d/.test(ch)){
-   groups.push(Number(ch));
-   if(groups.length>1)separators.push(pending);
-   pending=null;seenDigit=true;
-  }else if(/\s/.test(ch)){
-   continue;
-  }else if(ch==='?'){
-   questionCount++;
-   if(i===0){
-    leadingOkami=true;
-   }else if(i===chars.length-1){
-    trailingOkami=true;
-    if(pending==='/'){endGapSlash=true;pending=null;}
-    else if(pending!==null)throw Error('記号の位置を確認してください。');
-   }else{
-    if(!seenDigit||pending!==null)throw Error('記号の位置を確認してください。');
-    pending='?';
-   }
-  }else if(ch==='/'||ch==='!'){
-   if(!seenDigit||pending!==null)throw Error('記号の位置を確認してください。');
-   pending=ch;
-  }else throw Error('ネタ数には数字、/、!、? だけを使ってください。');
- }
- if(!groups.length)throw Error('ネタ数を入力してください。');
- if(pending!==null)throw Error('記号の後にネタ数を入力してください。');
- if(questionCount===0 && spMode!=='oya')throw Error('おかみスペシャルの位置が指定されていません。ネタ数欄に ? を1つ入力してください。');
- if(questionCount>1 || (questionCount===0 && spMode!=='oya'))throw Error('おかみスペシャルの位置を示す ? は1つだけ入力してください。');
- if(groups.some(x=>x<1||x>9))throw Error('各ネタ数は1〜9の1桁で入力してください。');
- return {groups,separators,leadingOkami,trailingOkami,endGapSlash};
-}
-function parseBuys(s){
- if(!/^\d+$/.test(s.trim()))throw Error('買い方には数字だけを入力してください。');
- return [...s.trim()].map(Number);
-}
-function distance(a,b){let d=Math.abs(a-b);return Math.min(d,N-d)}
-function satisfies(positions,seps){
- for(let i=0;i<seps.length;i++){
-  let min=99;
-  for(const a of positions[i])for(const b of positions[i+1])min=Math.min(min,distance(a,b));
-  if(seps[i]==='/'&&min!==3)return false;
-  if(seps[i]==='!'&&min!==2)return false;
- }
- return true;
-}
-function generateLayout(counts,seps,leadingOkami=false,trailingOkami=false,endGapSlash=false,spLabel="おかみSP"){
- const used=counts.reduce((a,b)=>a+b,0), spare=N-used;
- if(used>N)throw Error('ネタ数の合計が18を超えています。');
- // ? はおかみSPの位置指定。先頭 ? は最初のネタの手前、末尾 ? は最後のネタの奥、
- // 内部 ? は2つのネタブロックの間におかみSPを隣接させる。
- const minGap=seps.map(s=>(s==='/'?2:((s==='!'||s==='?')?1:0)));
- const endMin=endGapSlash?4:((leadingOkami||trailingOkami)?1:0);
- const minTotal=minGap.reduce((a,b)=>a+b,0)+endMin;
- if(minTotal>spare)throw Error(`間隔条件には最低${minTotal}個の空きポケットが必要ですが、残りは${spare}個です。`);
- for(let attempt=0;attempt<5000;attempt++){
-  const gaps=Array(counts.length).fill(0);
-  for(let i=0;i<seps.length;i++)gaps[i]=minGap[i];
-  gaps[counts.length-1]=endMin;
-  let left=spare-minTotal;
-  const expandable=[counts.length-1];
-  while(left>0){gaps[expandable[Math.floor(Math.random()*expandable.length)]]++;left--;}
-  const labels=[];
-  counts.forEach((c,i)=>{
-   for(let k=0;k<c;k++)labels.push(String.fromCharCode(65+i));
-   for(let k=0;k<gaps[i];k++){
-    let isOkami=false;
-    if(seps[i]==='?'&&k===0)isOkami=true;
-    if(i===counts.length-1){
-     if(endGapSlash&&k===2)isOkami=true;
-     else if(trailingOkami&&!endGapSlash&&k===0)isOkami=true;
-     else if(leadingOkami&&k===gaps[i]-1)isOkami=true;
-    }
-    labels.push(isOkami?spLabel:'その他');
-   }
-  });
-  // 先頭 ? は円環上で「最後のネタの奥」ではなく「最初のネタの手前」に見えるよう、
-  // おかみSPが先頭になる位置まで配列を回転する。円環の順序自体は維持される。
-  if(leadingOkami){const oi=labels.indexOf('おかみSP');if(oi>=0)labels.push(...labels.splice(0,oi));}
-  if(labels.length===N)return {labels,positions:counts.map((_,i)=>labels.map((v,j)=>v===String.fromCharCode(65+i)?j:-1).filter(j=>j>=0))};
- }
- throw Error('指定された条件で配置を生成できませんでした。');
-}
-const transitionWeightCache=new Map();
-function transitionWeight(mask,j){
- const key=mask*N+j;
- const cached=transitionWeightCache.get(key);if(cached!==undefined)return cached;
- if(mask&(1<<j)){transitionWeightCache.set(key,0);return 0;}
- let w=1,idx=(j-1+N)%N;
- while(mask&(1<<idx)){w++;idx=(idx-1+N)%N;}
- transitionWeightCache.set(key,w);return w;
-}
-function trans(mask,j){return transitionWeight(mask,j)/N;}
-function hitCounts(mask,labels,typeCount){
- const counts=Array(typeCount).fill(0);
- for(let j=0;j<N;j++)if(mask&(1<<j)){
-  const label=labels[j];
-  if(/^[A-R]$/.test(label)){
-   const t=label.charCodeAt(0)-65;
-   if(t>=0&&t<typeCount)counts[t]++;
-  }
- }
- return counts;
-}
-function stateMap3(){
- let states=new Map([[0,1]]);
- for(let t=0;t<3;t++){
-  const next=new Map();
-  for(const [mask,p] of states)for(let j=0;j<N;j++){
-   const q=trans(mask,j);if(q){const m=mask|(1<<j);next.set(m,(next.get(m)||0)+p*q);}
-  }
-  states=next;
- }
- return states;
-}
-function chanceTwo(mask,labels,buys,freeType){
- let sum=0;
- for(let j=0;j<N;j++){
-  const p1=trans(mask,j);if(!p1)continue;
-  const m1=mask|(1<<j);
-  for(let k=0;k<N;k++){
-   const p2=trans(m1,k);if(!p2)continue;
-   const counts=hitCounts(m1|(1<<k),labels,buys.length);
-   if(freeType>=0)counts[freeType]++;
-   if(counts.every((x,i)=>x>=buys[i]))sum+=p1*p2;
-  }
- }
- return sum;
-}
-function countWinningSuffixWays(mask,labels,buys,freeType){
- let ways=0;
- for(let j=0;j<N;j++){
-  const w1=transitionWeight(mask,j);if(!w1)continue;
-  const m1=mask|(1<<j);
-  for(let k=0;k<N;k++){
-   const w2=transitionWeight(m1,k);if(!w2)continue;
-   const counts=hitCounts(m1|(1<<k),labels,buys.length);
-   if(freeType>=0)counts[freeType]++;
-   if(counts.every((x,i)=>x>=buys[i]))ways+=w1*w2;
-  }
- }
- return ways;
-}
-
-function countFreeMissSuffixWays(mask,labels,buys,chosenFreeType){
- let ways=0;
- for(let j=0;j<N;j++){
-  const w1=transitionWeight(mask,j);if(!w1)continue;
-  const m1=mask|(1<<j);
-  for(let k=0;k<N;k++){
-   const w2=transitionWeight(m1,k);if(!w2)continue;
-   const counts=hitCounts(m1|(1<<k),labels,buys.length);
-   const chosen=counts.slice();chosen[chosenFreeType]++;
-   if(chosen.every((x,i)=>x>=buys[i]))continue;
-   let otherWouldWin=false;
-   for(let t=0;t<buys.length;t++){
-    if(t===chosenFreeType)continue;
-    const alternative=counts.slice();alternative[t]++;
-    if(alternative.every((x,i)=>x>=buys[i])){otherWouldWin=true;break;}
-   }
-   if(otherWouldWin)ways+=w1*w2;
-  }
- }
- return ways;
-}
-
-function stateWays3(){
- let states=new Map([[0,1]]);
- for(let t=0;t<3;t++){
-  const next=new Map();
-  for(const [mask,ways] of states)for(let j=0;j<N;j++){
-   const w=transitionWeight(mask,j);if(!w)continue;
-   const m=mask|(1<<j);next.set(m,(next.get(m)||0)+ways*w);
-  }
-  states=next;
- }
- return states;
-}
-function fmtInt(x){return x.toLocaleString('ja-JP')}
-function pct(x){return (x*100).toLocaleString('ja-JP',{minimumFractionDigits:2,maximumFractionDigits:4})+'%'}
-const TOTAL_ORDERED_WAYS=N**5;
-function drawLayout(labels){
- $('layout').innerHTML='';
- labels.forEach((name,i)=>{
-  const d=document.createElement('div');d.className='slot';
-  const small=document.createElement('small');small.textContent=`位置 ${i+1}`;
-  const b=document.createElement('b');b.textContent=($('spType')?.value==='either'&&name==='おかみSP')?'SP（おやじ/おかみ）':(($('spType')?.value==='oya'&&name==='おかみSP')?'おやじSP':name);
-  d.append(small,b);$('layout').append(d);
- });
-}
-function winWithCounts(counts,buys,freeType){
- const c=counts.slice();
- if(freeType>=0)c[freeType]++;
- return c.every((x,i)=>x>=buys[i]);
-}
-function chanceWithOkami(mask,labels,buys,freeType,okamiIndex){
- // mask is the first three occupied pockets. Enumerate the next two balls
- // using the original transition model; if Okami SP appears in the first five,
- // enumerate one additional ball uniformly over all 18 pockets.
- let sum=0;
- for(let j=0;j<N;j++){
-  const p1=trans(mask,j);if(!p1)continue;
-  const m1=mask|(1<<j);
-  for(let k=0;k<N;k++){
-   const p2=trans(m1,k);if(!p2)continue;
-   const m5=m1|(1<<k);
-   const counts=hitCounts(m5,labels,buys.length);
-   if(winWithCounts(counts,buys,freeType)){sum+=p1*p2;continue;}
-   if(!(m5&(1<<okamiIndex)))continue;
-   let extraWin=0;
-   for(let q=0;q<N;q++){
-    // Additional ball is uniform. Previously hit pockets are now misses,
-    // so only an unhit, ordinary neta pocket can add a neta hit.
-    const nextCounts=counts.slice();
-    if(!(m5&(1<<q)) && /^[A-R]$/.test(labels[q])){
-     const t=labels[q].charCodeAt(0)-65;
-     if(t>=0&&t<nextCounts.length)nextCounts[t]++;
-    }
-    if(winWithCounts(nextCounts,buys,freeType))extraWin++;
-   }
-   sum+=p1*p2*(extraWin/N);
-  }
- }
- return sum;
-}
-function countWaysOkami(mask,labels,buys,freeType,okamiIndex,mode){
- // Weighted ordered outcome count over a common N^6 denominator.
- // If Okami is absent in the first five, the 18 extra outcomes are equivalent copies.
- let ways=0;
- for(let j=0;j<N;j++){
-  const w1=transitionWeight(mask,j);if(!w1)continue;
-  const m1=mask|(1<<j);
-  for(let k=0;k<N;k++){
-   const w2=transitionWeight(m1,k);if(!w2)continue;
-   const m5=m1|(1<<k), counts=hitCounts(m5,labels,buys.length), base=w1*w2;
-   const won=winWithCounts(counts,buys,freeType);
-   if(won){ways+=base*N;continue;}
-   if(!(m5&(1<<okamiIndex)))continue;
-   for(let q=0;q<N;q++){
-    const nextCounts=counts.slice();
-    if(!(m5&(1<<q)) && /^[A-R]$/.test(labels[q])){
-     const t=labels[q].charCodeAt(0)-65;
-     if(t>=0&&t<nextCounts.length)nextCounts[t]++;
-    }
-    if(winWithCounts(nextCounts,buys,freeType))ways+=base;
-   }
-  }
- }
- return ways;
-}
-function countFreeMissOkami(mask,labels,buys,chosenFreeType,okamiIndex){
- let ways=0;
- for(let j=0;j<N;j++){
-  const w1=transitionWeight(mask,j);if(!w1)continue;
-  const m1=mask|(1<<j);
-  for(let k=0;k<N;k++){
-   const w2=transitionWeight(m1,k);if(!w2)continue;
-   const m5=m1|(1<<k), counts=hitCounts(m5,labels,buys.length), base=w1*w2;
-   const candidates=[];
-   for(let t=0;t<buys.length;t++)if(t!==chosenFreeType)candidates.push(t);
-   for(let q=0;q<N;q++){
-    const nextCounts=counts.slice();
-    if((m5&(1<<okamiIndex)) && !(m5&(1<<q)) && /^[A-R]$/.test(labels[q])){
-     const t=labels[q].charCodeAt(0)-65;
-     if(t>=0&&t<nextCounts.length)nextCounts[t]++;
-    }
-    const chosenWin=winWithCounts(nextCounts,buys,chosenFreeType);
-    if(chosenWin)continue;
-    if(candidates.some(t=>winWithCounts(nextCounts,buys,t)))ways+=base;
-   }
-  }
- }
- return ways;
-}
-function runOkami(){
- try{
-  const {groups,separators,leadingOkami,trailingOkami,endGapSlash}=parsePattern($('netaCount').value,$('spType').value);
-  const buys=parseBuys($('buyPattern').value);
-  const freeRateRaw=$('freeRate').value.trim();
-  const freeRatePercent=Number(freeRateRaw);
-  if(freeRateRaw===''||!Number.isFinite(freeRatePercent)||freeRatePercent<0||freeRatePercent>100)throw Error('フリー率は0〜100の範囲で入力してください。');
-  const freeRate=freeRatePercent/100;
-  const payoutRaw=$('payout').value.trim();
-  const payout=Number(payoutRaw);
-  if(payoutRaw===''||!Number.isFinite(payout)||payout<0)throw Error('配当は0以上の数値を入力してください。');
-  if(buys.length!==groups.length)throw Error(`買い方はネタ数と同じ${groups.length}桁で入力してください。`);
-  if(buys.some(x=>x<0))throw Error('買い方の数値を確認してください。');
-  if(buys.reduce((a,b)=>a+b,0)!==5)throw Error('買い方の合計は5にしてください（5個購入の計算です）。');
-  if(buys.some((x,i)=>x>groups[i]))throw Error('購入数がそのネタのポケット数を超えています。');
-  if(groups.reduce((a,b)=>a+b,0)>=N)throw Error('おかみスペシャル用に、ネタ以外の枠を1つ以上残してください（ネタ数合計は17以下）。');
-  const layout=generateLayout(groups,separators,leadingOkami,trailingOkami,endGapSlash);
-  const okamiIndex=layout.labels.indexOf('おかみSP');
-  if(okamiIndex<0)throw Error('おかみスペシャルの位置が指定されていません。');
-  drawLayout(layout.labels);
-  $('summary').textContent=`ネタ種類：${groups.length}種類 / ネタ数：${groups.join('・')} / 買い方：${buys.join('・')} / フリー率：${freeRatePercent}% / 配当：${payout} / おかみSP：位置${okamiIndex+1}`;
-  const states=stateMap3();const ways3=stateWays3();let win=0,already=0,possible=0;
-  let freeWinWays=0,noFreeWinWays=0,freeMissWays=0;
-  for(const [mask,p] of states){
-   const hc=hitCounts(mask,layout.labels,groups.length);
-   if(hc.every((x,i)=>x>=buys[i])){
-    win+=p;already+=p;
-    const prefixWays=ways3.get(mask)||0;
-    freeWinWays+=prefixWays*N*N*N;
-    noFreeWinWays+=prefixWays*N*N*N;
-    continue;
-   }
-   let best=-1,bestChance=-1;
-   for(let t=0;t<groups.length;t++){
-    if(hc[t]>=buys[t])continue;
-    const ch=chanceWithOkami(mask,layout.labels,buys,t,okamiIndex);
-    if(ch>bestChance+1e-13){best=t;bestChance=ch}
-   }
-   const noFreeChance=chanceWithOkami(mask,layout.labels,buys,-1,okamiIndex);
-   const mixedChance=freeRate* Math.max(0,bestChance) +(1-freeRate)*noFreeChance;
-   win+=p*mixedChance;
-   const prefixWays=ways3.get(mask)||0;
-   if(best>=0){
-    freeWinWays+=(ways3.get(mask)||0)*countWaysOkami(mask,layout.labels,buys,best,okamiIndex,'free');
-    freeMissWays+=(ways3.get(mask)||0)*countFreeMissOkami(mask,layout.labels,buys,best,okamiIndex);
-   }
-   noFreeWinWays+=(ways3.get(mask)||0)*countWaysOkami(mask,layout.labels,buys,-1,okamiIndex,'none');
-   if(mixedChance>0)possible+=p;
-  }
-  $('freeWinWays').textContent=`${fmtInt(freeWinWays)} / ${fmtInt(TOTAL_ORDERED_WAYS*N)}`;
-  $('noFreeWinWays').textContent=`${fmtInt(noFreeWinWays)} / ${fmtInt(TOTAL_ORDERED_WAYS*N)}`;
-  $('freeMissWays').textContent=`${fmtInt(freeMissWays)} / ${fmtInt(TOTAL_ORDERED_WAYS*N)}`;
-  $('winRate').textContent=pct(win);
-  $('expectedValue').textContent=pct(win*payout/20);
-  $('status').textContent='計算完了。おかみスペシャルの追加抽選を反映しました。';$('status').className='success';
- }catch(e){$('status').textContent=e.message;$('status').className='error';}
-}
-function runOya(){
- try{
-  const {groups,separators,leadingOkami,trailingOkami,endGapSlash}=parsePattern($('netaCount').value,'oya');
-  const buys=parseBuys($('buyPattern').value);
-  const fr=$('freeRate').value.trim(),freePercent=Number(fr);
-  if(fr===''||!Number.isFinite(freePercent)||freePercent<0||freePercent>100)throw Error('フリー率は0〜100の範囲で入力してください。');
-  const freeRate=freePercent/100, pr=$('payout').value.trim(),payout=Number(pr);
-  if(pr===''||!Number.isFinite(payout)||payout<0)throw Error('配当は0以上の数値を入力してください。');
-  if(buys.length!==groups.length)throw Error(`買い方はネタ数と同じ${groups.length}桁で入力してください。`);
-  if(buys.reduce((a,b)=>a+b,0)!==5)throw Error('買い方の合計は5にしてください（5個購入の計算です）。');
-  if(buys.some((x,i)=>x>groups[i]))throw Error('購入数がそのネタのポケット数を超えています。');
-  if(groups.reduce((a,b)=>a+b,0)>=N)throw Error('ネタ以外の枠を1つ以上残してください（ネタ数合計は17以下）。');
-  const layout=generateLayout(groups,separators,leadingOkami,trailingOkami,endGapSlash,'おやじSP');
-  drawLayout(layout.labels.map(x=>x==='おかみSP'?'おやじSP':x));
-  $('summary').textContent=`SP：おやじスペシャル（追加球なし） / ネタ種類：${groups.length} / ネタ数：${groups.join('・')} / 買い方：${buys.join('・')} / フリー率：${freePercent}% / 配当：${payout}`;
-  const states=stateMap3(),ways3=stateWays3();let win=0,already=0,possible=0,freeWays=0,noFreeWays=0,missWays=0;
-  for(const [mask,p] of states){
-   const hc=hitCounts(mask,layout.labels,groups.length),prefix=ways3.get(mask)||0;
-   if(hc.every((x,i)=>x>=buys[i])){win+=p;already+=p;freeWays+=prefix*N*N;noFreeWays+=prefix*N*N;continue;}
-   let best=-1,bestChance=-1;
-   for(let t=0;t<groups.length;t++){if(hc[t]>=buys[t])continue;const ch=chanceTwo(mask,layout.labels,buys,t);if(ch>bestChance+1e-13){best=t;bestChance=ch;}}
-   const noFree=chanceTwo(mask,layout.labels,buys,-1),mixed=freeRate*Math.max(0,bestChance)+(1-freeRate)*noFree;
-   win+=p*mixed;if(mixed>0)possible+=p;
-   if(best>=0){freeWays+=prefix*countWinningSuffixWays(mask,layout.labels,buys,best);missWays+=prefix*countFreeMissSuffixWays(mask,layout.labels,buys,best);}
-   noFreeWays+=prefix*countWinningSuffixWays(mask,layout.labels,buys,-1);
-  }
-  $('freeWinWays').textContent=`${fmtInt(freeWays)} / ${fmtInt(N**5)}`;$('noFreeWinWays').textContent=`${fmtInt(noFreeWays)} / ${fmtInt(N**5)}`;$('freeMissWays').textContent=`${fmtInt(missWays)} / ${fmtInt(N**5)}`;
-  $('winRate').textContent=pct(win);$('expectedValue').textContent=pct(win*payout/20);
-  $('status').textContent='計算完了。おやじスペシャル（追加球なし）として計算しました。';$('status').className='success';
- }catch(e){$('status').textContent=e.message;$('status').className='error';}
-}
-function runEither(){
- // SP type is hidden until the fifth ball. Choose ONE free type after ball 3
- // by maximizing the 50:50 expected win probability across Oya and Okami.
- try{
-  const {groups,separators,leadingOkami,trailingOkami,endGapSlash}=parsePattern($('netaCount').value,'either');
-  const buys=parseBuys($('buyPattern').value);
-  const fr=$('freeRate').value.trim(),freePercent=Number(fr);
-  if(fr===''||!Number.isFinite(freePercent)||freePercent<0||freePercent>100)throw Error('フリー率は0〜100の範囲で入力してください。');
-  const freeRate=freePercent/100,pr=$('payout').value.trim(),payout=Number(pr);
-  if(pr===''||!Number.isFinite(payout)||payout<0)throw Error('配当は0以上の数値を入力してください。');
-  if(buys.length!==groups.length)throw Error(`買い方はネタ数と同じ${groups.length}桁で入力してください。`);
-  if(buys.some(x=>x<0))throw Error('買い方の数値を確認してください。');
-  if(buys.reduce((a,b)=>a+b,0)!==5)throw Error('買い方の合計は5にしてください（5個購入の計算です）。');
-  if(buys.some((x,i)=>x>groups[i]))throw Error('購入数がそのネタのポケット数を超えています。');
-  if(groups.reduce((a,b)=>a+b,0)>=N)throw Error('ネタ以外の枠を1つ以上残してください（ネタ数合計は17以下）。');
-  const layout=generateLayout(groups,separators,leadingOkami,trailingOkami,endGapSlash,'おかみSP');
-  const okamiIndex=layout.labels.indexOf('おかみSP');
-  if(okamiIndex<0)throw Error('おかみスペシャルの位置が指定されていません。');
-  drawLayout(layout.labels);
-  $('summary').textContent=`SP：どっちかスペシャル（おやじ：おかみ＝1：1） / ネタ種類：${groups.length} / ネタ数：${groups.join('・')} / 買い方：${buys.join('・')} / フリー率：${freePercent}% / 配当：${payout}`;
-  const states=stateMap3(),ways3=stateWays3();
-  let win=0,already=0,possible=0,freeWays=0,noFreeWays=0,missWays=0;
-  for(const [mask,p] of states){
-   const hc=hitCounts(mask,layout.labels,groups.length),prefix=ways3.get(mask)||0;
-   if(hc.every((x,i)=>x>=buys[i])){
-    win+=p;already+=p;
-    freeWays+=prefix*N**3;noFreeWays+=prefix*N**3;
-    continue;
-   }
-   let best=-1,bestMixed=-1,bestOya=0,bestOkami=0;
-   for(let t=0;t<groups.length;t++){
-    if(hc[t]>=buys[t])continue;
-    const co=chanceTwo(mask,layout.labels,buys,t);
-    const ck=chanceWithOkami(mask,layout.labels,buys,t,okamiIndex);
-    const mixed=(co+ck)/2;
-    if(mixed>bestMixed+1e-13){best=t;bestMixed=mixed;bestOya=co;bestOkami=ck;}
-   }
-   const noOya=chanceTwo(mask,layout.labels,buys,-1);
-   const noOkami=chanceWithOkami(mask,layout.labels,buys,-1,okamiIndex);
-   const noFree=(noOya+noOkami)/2;
-   const mixedChance=freeRate*Math.max(0,bestMixed)+(1-freeRate)*noFree;
-   win+=p*mixedChance;if(mixedChance>0)possible+=p;
-   if(best>=0){
-    // Put both branches on the same N^6 weighted denominator before 1:1 averaging.
-    freeWays+=(prefix*countWinningSuffixWays(mask,layout.labels,buys,best)*N + prefix*countWaysOkami(mask,layout.labels,buys,best,okamiIndex,'free'))/2;
-    missWays+=(prefix*countFreeMissSuffixWays(mask,layout.labels,buys,best)*N + prefix*countFreeMissOkami(mask,layout.labels,buys,best,okamiIndex))/2;
-   }
-   noFreeWays+=(prefix*countWinningSuffixWays(mask,layout.labels,buys,-1)*N + prefix*countWaysOkami(mask,layout.labels,buys,-1,okamiIndex,'none'))/2;
-  }
-  $('freeWinWays').textContent=`${fmtInt(Math.round(freeWays))} / ${fmtInt(N**6)}`;
-  $('noFreeWinWays').textContent=`${fmtInt(Math.round(noFreeWays))} / ${fmtInt(N**6)}`;
-  $('freeMissWays').textContent=`${fmtInt(Math.round(missWays))} / ${fmtInt(N**6)}`;
-  $('winRate').textContent=pct(win);$('expectedValue').textContent=pct(win*payout/20);
-  $('status').textContent='計算完了。SPの種類が不明な状態で共通のフリー選択を最適化し、おやじ・おかみを1：1で合算しました。';$('status').className='success';
- }catch(e){$('status').textContent=e.message;$('status').className='error';}
-}
-function run(){
- const mode=$('spType').value;
- if(mode==='oya')return runOya();
- if(mode==='either')return runEither();
- return runOkami();
-}
-
-function calculateProfitProbability(){
- try{
-  const targetRaw=$('targetWinProbability').value.trim();
-  const targetPercent=Number(targetRaw);
-  if(targetRaw===''||!Number.isFinite(targetPercent)||targetPercent<0||targetPercent>100)throw Error('目標勝率は0〜100％で入力してください。');
-  // 勝率計算ボタン単独でも、現在の買い方・フリー率・配当を反映する
-  run();
-  if($('status').className!=='success')throw Error('買い方・フリー率・配当などの入力内容を確認してください。');
-  const winText=$('winRate').textContent;
-  if(winText==='—')throw Error('当選率を計算できませんでした。');
-  const winProbability=Number(winText.replace('%','').replace(/,/g,''))/100;
-  const payoutRaw=$('payout').value.trim();
-  const payout=Number(payoutRaw);
-  if(!Number.isFinite(payout)||payout<=0)throw Error('配当額は0より大きい数値にしてください。');
-  const target=targetPercent/100;
-  const maxTrials=100000, exactLimit=5000;
-  // 小さい試行回数は二項分布を厳密計算。大きい範囲は正規近似で探索し、100,000回までの処理時間を抑える。
-  const dp=new Float64Array(exactLimit+1);dp[0]=1;
-  let answer=0,answerProbability=0;
-  for(let n=1;n<=exactLimit;n++){
-   for(let k=n;k>=1;k--)dp[k]=dp[k]*(1-winProbability)+dp[k-1]*winProbability;
-   dp[0]*=(1-winProbability);
-   const minWins=Math.floor((20*n)/payout)+1;
-   let blackProbability=0;
-   for(let k=minWins;k<=n;k++)blackProbability+=dp[k];
-   if(blackProbability>target+1e-14){answer=n;answerProbability=blackProbability;break;}
-  }
-  function normalCdf(z){
-   const x=Math.abs(z),t=1/(1+0.2316419*x);
-   const d=0.3989422804014327*Math.exp(-x*x/2);
-   const tail=d*t*(0.319381530+t*(-0.356563782+t*(1.781477937+t*(-1.821255978+t*1.330274429))));
-   return z>=0?1-tail:tail;
-  }
-  if(!answer){
-   for(let n=exactLimit+1;n<=maxTrials;n++){
-    const minWins=Math.floor((20*n)/payout)+1;
-    let blackProbability=0;
-    if(winProbability<=0)blackProbability=0;
-    else if(winProbability>=1)blackProbability=(payout*n>20*n)?1:0;
-    else if(minWins<=0)blackProbability=1;
-    else if(minWins>n)blackProbability=0;
-    else {
-     const mean=n*winProbability,variance=n*winProbability*(1-winProbability);
-     const z=(minWins-0.5-mean)/Math.sqrt(variance);
-     blackProbability=1-normalCdf(z);
-    }
-    if(blackProbability>target+1e-14){answer=n;answerProbability=blackProbability;break;}
-   }
-  }
-  if(answer){
-   $('requiredTrials').textContent=fmtInt(answer)+'回';
-   $('profitProbabilityResult').textContent=pct(answerProbability);
-   $('profitProbabilityStatus').textContent=`目標の${targetPercent}%を初めて上回るのは${answer}回目です。各試行の当選率を${pct(winProbability)}として計算しました。5,000回までは厳密計算、それ以降は正規近似です。`;
-   $('profitProbabilityStatus').className='success';
-  }else{
-   $('requiredTrials').textContent='見つかりません';
-   $('profitProbabilityResult').textContent='—';
-   $('profitProbabilityStatus').textContent='100,000回以内では目標勝率を上回りませんでした。5,000回までは厳密計算、それ以降は正規近似で探索しています。';
-   $('profitProbabilityStatus').className='error';
-  }
- }catch(e){$('profitProbabilityStatus').textContent=e.message;$('profitProbabilityStatus').className='error';}
-}
-$('calculate').addEventListener('click',run);
-$('spType').addEventListener('change',()=>{ $('status').textContent='SPの種類を変更しました。入力内容を確認して「配置を生成して計算」を押してください。'; $('status').className=''; });
-$('calculateProfitProbability').addEventListener('click',calculateProfitProbability);
-$('status').textContent='入力内容を確認して「配置を生成して計算」を押してください。';
-</script>
-</body></html>
+    <section class="panel assumptions"><h2>計算ルール</h2><ul>
+      <li>通常17穴＋SP1穴。☆は異なるネタの境目に1つだけ置きます。</li>
+      <li>最初の5球は各18位置への到達を均等とし、入賞済みの穴に来た球は、並び順の後ろの空き穴まで進みます。最後の穴の次は先頭です。</li>
+      <li>最初の3球の結果を見て、残りの抽選で当選率が最も高くなるネタにフリーを1個付けます。フリーが使えない場合でも、5球だけで購入条件を満たせば当選です。</li>
+      <li>おやじSPは追加球なし。おかみSPは最初の5球でSPに入ると1球追加。追加球は18穴均等で、入賞済みの穴に来た場合は外れです（1.0.0と同じルール）。</li>
+      <li>どっちかSPは、おやじ・おかみを50％ずつとし、SPの正体が分からない3球時点で共通のフリー選択を最適化します。</li>
+      <li>穴の埋まりは1ゲーム内だけ引き継ぎ、次のゲームではリセットします。</li>
+    </ul></section>
+  </main>
+  <footer>がっぽり寿司極 期待値計算機 <strong>1.1.0</strong><br><a href="https://github.com/tonnchiki/gappori-sushi-kiwami_mackey">GitHub</a> · <a href="https://github.com/tonnchiki/gappori-sushi-kiwami_mackey/releases">バージョン履歴</a></footer>
+  <noscript><p class="panel error">計算機を使うにはブラウザのJavaScriptを有効にしてください。</p></noscript>
+</body>
+</html>
